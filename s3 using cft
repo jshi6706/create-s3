@@ -1,0 +1,43 @@
+{
+  "Resources": {
+    "trainingS3Bucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "sjw-training-bucket1",
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": false,
+          "IgnorePublicAcls": false,
+          "BlockPublicPolicy": false,
+          "RestrictPublicBuckets": false
+        },
+        "ObjectLockConfiguration": {
+          "ObjectLockEnabled": "Enabled",
+          "Rule": {
+            "DefaultRetention": {
+              "Mode": "COMPLIANCE",
+              "Years": 1
+            }
+          }
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "ObjectLockEnabled": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Emily"
+          },
+          {
+            "Key": "Department",
+            "Value": "DE"
+          },
+          {
+            "Key": "Email",
+            "Value": "sjw292880@gmail.com"
+          }
+        ]
+      }
+    }
+  }
+}
