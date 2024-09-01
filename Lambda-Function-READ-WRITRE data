@@ -1,0 +1,28 @@
+import json
+import boto3
+
+# create S3 resource
+s3_resource = boto3.resource('s3')
+# define S3 bucket and object name
+read_bk_name = 'r-b1'
+rw_bk='sjw-training-bucket1'
+write_bk_name='r-b2'
+object_key = 'copy_temp.json'
+def lambda_handler(event, context):
+    # get S3 object
+    s3_object = s3_resource.Object(read_bk_name, object_key)
+    s3_object2 = s3_resource.Object(rw_bk, object_key)
+    # read object content
+    json_data = s3_object.get()['Body'].read().decode('utf-8')
+    json_data = s3_object2.get()['Body'].read().decode('utf-8')
+    # loads JSON data
+    json_object = json.loads(json_data)
+    # use json_object to access JSON data
+    print(json_object)
+    
+    str=' hello this is day5 hw'
+    encode_str=str.encode('utf-8')
+    filename='hw-d5.txt'
+    s3_path='hw-d5/'+filename
+    s3_resource.Bucket(write_bk_name).put_object(Key=s3_path,Body=encode_str)
+    s3_resource.Bucket(rw_bk).put_object(Key=s3_path,Body=encode_str)
