@@ -1,0 +1,520 @@
+{
+  "Parameters": {
+    "Account": {
+      "Default": "sjw907",
+      "Description": "AWS Account Name",
+      "Type": "String"
+    },
+    "Region": {
+      "Default": "us-west-1",
+      "Type": "String",
+      "Description": "AWS Region"
+    },
+    "AccountID": {
+      "Default": "251386158873",
+      "Description": "AWS Account ID",
+      "Type": "String"
+    },
+    "FunctionName": {
+      "Default": "CA_Send_Email_Lambda",
+      "Description": "Lambda Function Name",
+      "Type": "String"
+    },
+    "KmsKeyAlias": {
+      "Default": "alias/w2_kinesis_lambda_key",
+      "Description": "KmsKey to encrypt and decrypt objects in the raw bucket",
+      "Type": "String"
+    },
+    "KmsKeyArn": {
+      "Default": "arn:aws:kms:us-west-1:251386158873:key/bb354a59-b0fc-4375-8446-c55b2f08fe67",
+      "Description": "KmsKey to encrypt and decrypt objects in the raw bucket",
+      "Type": "String"
+    },
+    "SQSName": {
+      "Default": "CASQS",
+      "Description": "SQS Queue Name",
+      "Type": "String"
+    },
+    "SNSName": {
+      "Default": "CA-Schema-Change-Detection-Tpc-SJW",
+      "Description": "SNS Topic Name",
+      "Type": "String"
+    },
+    "SendEmailSNSname": {
+      "Default": "CA-SNS-send-email-tpc",
+      "Description": "SNS Topic Name",
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "sendemailSNS": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "DisplayName": "Send Email topic",
+        "KmsMasterKeyId": {
+          "Ref": "KmsKeyAlias"
+        },
+        "Subscription": [
+          {
+            "Endpoint": "3609908298",
+            "Protocol": "sms"
+          },
+          {
+            "Endpoint": "sjw292880@gmail.com",
+            "Protocol": "email"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Emily"
+          },
+          {
+            "Key": "Department",
+            "Value": "DE"
+          },
+          {
+            "Key": "Email",
+            "Value": "sjw292880@gmail.com"
+          }
+        ],
+        "TopicName": {
+          "Ref": "SendEmailSNSname"
+        }
+      }
+    },
+    "SendEmailSNSPolicy": {
+      "Type": "AWS::SNS::TopicPolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AccountAccess",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Action": [
+                "SNS:GetTopicAttributes",
+                "SNS:SetTopicAttributes",
+                "SNS:AddPermission",
+                "SNS:RemovePermission",
+                "SNS:DeleteTopic",
+                "SNS:Subscribe",
+                "SNS:ListSubscriptionsByTopic",
+                "SNS:Publish"
+              ],
+              "Resource": [
+                {
+                  "Ref": "sendemailSNS"
+                }
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceOwner": "251386158873"
+                }
+              }
+            },
+            {
+              "Sid": "LambdaAccess",
+              "Action": [
+                "sns:Publish"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Resource": [
+                {
+                  "Ref": "sendemailSNS"
+                }
+              ]
+            }
+          ]
+        },
+        "Topics": [
+          {
+            "Ref": "sendemailSNS"
+          }
+        ]
+      }
+    },
+    "sendviaSNS": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "DisplayName": "Receive Event topic",
+        "KmsMasterKeyId": {
+          "Ref": "KmsKeyAlias"
+        },
+        "Subscription": [
+          {
+            "Endpoint": "3609908298",
+            "Protocol": "sms"
+          },
+          {
+            "Endpoint": "sjw292880@gmail.com",
+            "Protocol": "email"
+          },
+          {
+            "Endpoint": {
+              "Fn::Sub": "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:${SQSName}"
+            },
+            "Protocol": "sqs"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Emily"
+          },
+          {
+            "Key": "Department",
+            "Value": "DE"
+          },
+          {
+            "Key": "Email",
+            "Value": "sjw292880@gmail.com"
+          }
+        ],
+        "TopicName": {
+          "Ref": "SNSName"
+        }
+      }
+    },
+    "CaSNSPolicy": {
+      "Type": "AWS::SNS::TopicPolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": [
+                "sns:AddPermission",
+                "sns:DeleteTopic",
+                "sns:GetTopicAttributes",
+                "sns:ListSubscriptionsByTopic",
+                "sns:Publish",
+                "sns:SetTopicAttributes",
+                "sns:Subscribe",
+                "sns:Receive",
+                "sns:RemovePermission"
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceOwner": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Ref": "sendviaSNS"
+                }
+              ],
+              "Sid": "SNSPolicy"
+            },
+            {
+              "Action": [
+                "sns:Publish"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com"
+              },
+              "Resource": [
+                {
+                  "Ref": "sendviaSNS"
+                }
+              ],
+              "Sid": "EventAccess"
+            }
+          ]
+        },
+        "Topics": [
+          {
+            "Ref": "sendviaSNS"
+          }
+        ]
+      }
+    },
+    "CaSQS": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "KmsMasterKeyId": {
+          "Ref": "KmsKeyAlias"
+        },
+        "QueueName": {
+          "Ref": "SQSName"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Emily"
+          },
+          {
+            "Key": "Department",
+            "Value": "DE"
+          },
+          {
+            "Key": "Email",
+            "Value": "sjw292880@gmail.com"
+          }
+        ],
+        "VisibilityTimeout": 720
+      }
+    },
+    "CaSQSPolicy": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Properties": {
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RootAccountAccess",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:iam::",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":root"
+                    ]
+                  ]
+                }
+              },
+              "Action": "sqs:*",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CaSQS",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Sid": "Topic-subscription",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Action": "sqs:SendMessage",
+              "Condition": {
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Sub": "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${SNSName}"
+                  }
+                }
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CaSQS",
+                  "Arn"
+                ]
+              }
+            }
+          ]
+        },
+        "Queues": [
+          {
+            "Ref": "CaSQS"
+          }
+        ]
+      }
+    },
+    "SendEmailLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Architectures": [
+          "x86_64"
+        ],
+        "Code": {
+          "S3Bucket": "sjw-training-bucket1",
+          "S3Key": "send_email_lambda.zip"
+        },
+        "Environment": {
+          "Variables": {
+            "KmsKeyAlias": {
+              "Ref": "KmsKeyAlias"
+            }
+          }
+        },
+        "Description": "send email lambda using cft",
+        "EphemeralStorage": {
+          "Size": 1024
+        },
+        "FunctionName": {
+          "Ref": "FunctionName"
+        },
+        "Handler": "send_email_lambda.lambda_handler",
+        "MemorySize": 128,
+        "PackageType": "Zip",
+        "Role": {
+          "Fn::GetAtt": [
+            "SendEmailLambdaRole",
+            "Arn"
+          ]
+        },
+        "Runtime": "python3.11",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Emily"
+          },
+          {
+            "Key": "Department",
+            "Value": "DE"
+          },
+          {
+            "Key": "Email",
+            "Value": "sjw292880@gmail.com"
+          }
+        ],
+        "Timeout": 60
+      }
+    },
+    "SendEmailLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "KinesisAccess",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "LogAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:*"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Sid": "SQSAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueUrl",
+                    "sqs:ChangeMessageVisibility",
+                    "sqs:ReceiveMessage",
+                    "sqs:GetQueueAttributes"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "CaSQS",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Sid": "SNSPermission",
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": {
+                    "Ref": "sendemailSNS"
+                  }
+                },
+                {
+                  "Sid": "KMSAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "kms:Encrypt*",
+                    "kms:Decrypt*",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:Describe*"
+                  ],
+                  "Resource": {
+                    "Ref": "KmsKeyArn"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "Account"
+              },
+              {
+                "Ref": "AWS::Region"
+              },
+              "Ca-Email-Lambda-Role"
+            ]
+          ]
+        }
+      }
+    },
+    "SQSEventSourceMapping": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "DependsOn": [
+        "CaSQS",
+        "SendEmailLambda"
+      ],
+      "Properties": {
+        "Enabled": true,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "CaSQS",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "SendEmailLambda",
+            "Arn"
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "sendemailSNS": {
+      "Description": "Send Email Topic",
+      "Value": {
+        "Ref": "sendemailSNS"
+      }
+    },
+    "sendviaSNS": {
+      "Description": "Schema Change Detection Topic",
+      "Value": {
+        "Ref": "sendviaSNS"
+      }
+    },
+    "CaSQS": {
+      "Description": "CaSQS",
+      "Value": {
+        "Fn::GetAtt": [
+          "CaSQS",
+          "QueueName"
+        ]
+      }
+    }
+  }
+}
