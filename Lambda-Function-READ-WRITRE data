@@ -1,7 +1,7 @@
 import json
 import boto3
 
-# create S3 resource
+# create S3 resource 
 s3_resource = boto3.resource('s3')
 # define S3 bucket and object name
 read_bk_name = 'r-b1'
